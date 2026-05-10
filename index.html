@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#111827" />
+  <title>手機排班工具</title>
+  <style>
+    :root {
+      --bg: #f5f5f4;
+      --card: #ffffff;
+      --text: #1c1917;
+      --muted: #78716c;
+      --line: #e7e5e4;
+      --dark: #111827;
+      --soft: #f8fafc;
+      --warn-bg: #fffbeb;
+      --warn: #92400e;
+      --ok-bg: #ecfdf5;
+      --ok: #065f46;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .app {
+      width: min(100%, 520px);
+      margin: 0 auto;
+      padding: 16px 14px 92px;
+    }
+    .hero, .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
+    }
+    .hero { padding: 20px; }
+    .eyebrow { color: var(--muted); font-size: 13px; margin: 0 0 4px; }
+    h1 { margin: 0; font-size: 26px; line-height: 1.2; letter-spacing: -0.02em; }
+    h2 { font-size: 18px; margin: 22px 4px 10px; }
+    p { line-height: 1.55; }
+    .desc { color: var(--muted); font-size: 14px; margin: 10px 0 0; }
+    .week-box {
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 18px;
+      background: #fafaf9;
+      border: 1px solid var(--line);
+    }
+    .week-title { font-weight: 700; margin-bottom: 10px; }
+    .week-controls { display: grid; grid-template-columns: 42px 1fr 42px; gap: 8px; }
+    input, select, button {
+      font: inherit;
+      border-radius: 14px;
+    }
+    input, select {
+      width: 100%;
+      border: 1px solid var(--line);
+      background: white;
+      padding: 11px 12px;
+      min-height: 44px;
+      outline: none;
+    }
+    button {
+      min-height: 44px;
+      border: 0;
+      padding: 10px 14px;
+      font-weight: 700;
+      background: var(--dark);
+      color: white;
+      cursor: pointer;
+    }
+    button.secondary { background: #e7e5e4; color: #292524; }
+    button.danger { background: #fee2e2; color: #991b1b; }
+    .full { width: 100%; margin-top: 8px; }
+    .card { padding: 14px; margin: 10px 0; }
+    .add-grid { display: grid; grid-template-columns: 92px 1fr; gap: 8px; }
+    .person-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+    .person-name { font-weight: 800; font-size: 17px; }
+    .small { color: var(--muted); font-size: 12px; margin-top: 2px; }
+    .days { margin-top: 12px; display: grid; gap: 8px; }
+    .day-row {
+      display: grid;
+      grid-template-columns: 82px 1fr;
+      align-items: center;
+      gap: 8px;
+      background: #fafaf9;
+      border: 1px solid #f0efee;
+      padding: 8px;
+      border-radius: 16px;
+    }
+    .day-label { font-size: 13px; font-weight: 700; }
+    .date { display: block; color: var(--muted); font-size: 11px; font-weight: 500; }
+    .stats-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+    .stat {
+      background: #fafaf9;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 8px 2px;
+      text-align: center;
+      font-size: 11px;
+    }
+    .stat b { display: block; font-size: 13px; }
+    .notice {
+      margin-top: 12px;
+      padding: 12px;
+      border-radius: 18px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    .notice.warn { background: var(--warn-bg); color: var(--warn); }
+    .notice.ok { background: var(--ok-bg); color: var(--ok); }
+    .sticky {
+      position: fixed;
+      left: 50%;
+      bottom: calc(12px + env(safe-area-inset-bottom));
+      transform: translateX(-50%);
+      width: min(100% - 28px, 492px);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      z-index: 20;
+    }
+    .sticky button { min-height: 54px; box-shadow: 0 12px 24px rgba(15, 23, 42, 0.18); }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 5px 9px;
+      background: #f5f5f4;
+      color: var(--muted);
+      font-size: 12px;
+      margin-left: 6px;
+    }
+    .empty { color: var(--muted); font-size: 14px; padding: 12px 4px; }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <section class="hero">
+      <p class="eyebrow">手機排班工具</p>
+      <h1>下週班表</h1>
+      <p class="desc">每次開啟會自動帶入下一週一到週日。可新增、刪除人員，修改日期，排完後一鍵複製給 LINE 或再貼回 Excel。</p>
+      <div class="week-box">
+        <div class="week-title" id="weekTitle">班表日期</div>
+        <div class="week-controls">
+          <button class="secondary" id="prevWeek" aria-label="上一週">‹</button>
+          <input type="date" id="weekStart" />
+          <button class="secondary" id="nextWeek" aria-label="下一週">›</button>
+        </div>
+        <button class="secondary full" id="defaultWeek">回到下一週班表</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="person-name">新增人員</div>
+      <div class="add-grid" style="margin-top:10px;">
+        <select id="newGroup">
+          <option value="櫃台">櫃台</option>
+          <option value="銷售">銷售</option>
+        </select>
+        <input id="newName" placeholder="輸入姓名" />
+      </div>
+      <button class="full" id="addStaff">加入班表</button>
+    </section>
+
+    <section id="staffSections"></section>
+
+    <section class="card">
+      <div class="person-name">每日人力檢查</div>
+      <div class="stats-grid" id="statsGrid" style="margin-top:12px;"></div>
+      <div id="warnings"></div>
+    </section>
+  </main>
+
+  <div class="sticky">
+    <button class="secondary" id="resetSchedule">重排</button>
+    <button id="copySchedule">複製班表</button>
+  </div>
+
+  <script>
+    const weekdayLabels = ["一", "二", "三", "四", "五", "六", "日"];
+    const shiftOptions = ["上班", "休", "早", "晚", "早多", "晚多"];
+    const groups = ["櫃台", "銷售"];
+    const storageKey = "mobile-shift-scheduler-v1";
+
+    const defaultStaff = [
+      { id: "counter-1", group: "櫃台", name: "王柏勳", weeklyOffLimit: 1 },
+      { id: "counter-2", group: "櫃台", name: "曾琛苡", weeklyOffLimit: 2 },
+      { id: "counter-3", group: "櫃台", name: "石嫚倪", weeklyOffLimit: 2 },
+      { id: "counter-4", group: "櫃台", name: "黃韻蓁", weeklyOffLimit: 2 },
+      { id: "counter-5", group: "櫃台", name: "鄭詩怡", weeklyOffLimit: 2 },
+      { id: "counter-6", group: "櫃台", name: "鄭毓柔", weeklyOffLimit: 5 },
+      { id: "sales-1", group: "銷售", name: "黃素月", weeklyOffLimit: 2 },
+      { id: "sales-2", group: "銷售", name: "高圓媛", weeklyOffLimit: 1 },
+      { id: "sales-3", group: "銷售", name: "鄭冠琳", weeklyOffLimit: 1 },
+      { id: "sales-4", group: "銷售", name: "宋大喜", weeklyOffLimit: 2 },
+      { id: "sales-5", group: "銷售", name: "陳金燕", weeklyOffLimit: 1 }
+    ];
+
+    let state = loadState();
+
+    function getNextMonday(base = new Date()) {
+      const date = new Date(base);
+      const day = date.getDay();
+      const diff = day === 0 ? 1 : 8 - day;
+      date.setDate(date.getDate() + diff);
+      date.setHours(0, 0, 0, 0);
+      return date;
+    }
+
+    function toInputDate(date) {
+      const d = new Date(date);
+      d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+      return d.toISOString().slice(0, 10);
+    }
+
+    function formatDate(date) {
+      const d = new Date(date);
+      return `${d.getMonth() + 1}/${d.getDate()}`;
+    }
+
+    function buildWeek(startDate) {
+      return Array.from({ length: 7 }, (_, index) => {
+        const d = new Date(startDate);
+        d.setDate(d.getDate() + index);
+        return d;
+      });
+    }
+
+    function createSchedule(staff) {
+      const schedule = {};
+      staff.forEach(person => schedule[person.id] = Array(7).fill("上班"));
+      return schedule;
+    }
+
+    function loadState() {
+      const defaultWeek = toInputDate(getNextMonday());
+      try {
+        const saved = JSON.parse(localStorage.getItem(storageKey));
+        if (saved && saved.staff && saved.schedule) {
+          return {
+            staff: saved.staff,
+            schedule: ensureSchedule(saved.staff, saved.schedule),
+            weekStart: defaultWeek
+          };
+        }
+      } catch (error) {}
+      return { staff: defaultStaff, schedule: createSchedule(defaultStaff), weekStart: defaultWeek };
+    }
+
+    function ensureSchedule(staff, schedule) {
+      const next = { ...schedule };
+      staff.forEach(person => {
+        if (!Array.isArray(next[person.id])) next[person.id] = Array(7).fill("上班");
+      });
+      return next;
+    }
+
+    function saveState() {
+      localStorage.setItem(storageKey, JSON.stringify({
+        staff: state.staff,
+        schedule: state.schedule
+      }));
+    }
+
+    function render() {
+      const weekStart = new Date(state.weekStart + "T00:00:00");
+      const weekDates = buildWeek(weekStart);
+      document.getElementById("weekStart").value = state.weekStart;
+      document.getElementById("weekTitle").textContent = `${formatDate(weekDates[0])} - ${formatDate(weekDates[6])}`;
+
+      const root = document.getElementById("staffSections");
+      root.innerHTML = "";
+      groups.forEach(group => {
+        const title = document.createElement("h2");
+        title.textContent = group;
+        root.appendChild(title);
+        const people = state.staff.filter(person => person.group === group);
+        if (people.length === 0) {
+          const empty = document.createElement("div");
+          empty.className = "empty";
+          empty.textContent = `目前沒有${group}人員`;
+          root.appendChild(empty);
+        }
+        people.forEach(person => root.appendChild(renderPersonCard(person, weekDates)));
+      });
+
+      renderStats(weekDates);
+      saveState();
+    }
+
+    function renderPersonCard(person, weekDates) {
+      const card = document.createElement("div");
+      card.className = "card";
+      const offCount = (state.schedule[person.id] || []).filter(value => value === "休").length;
+      card.innerHTML = `
+        <div class="person-head">
+          <div>
+            <div class="person-name">${escapeHtml(person.name)}<span class="pill">${person.group}</span></div>
+            <div class="small">本週休 ${offCount} / ${person.weeklyOffLimit} 天</div>
+          </div>
+          <button class="danger" data-remove="${person.id}">刪除</button>
+        </div>
+        <div class="days"></div>
+      `;
+      const days = card.querySelector(".days");
+      weekdayLabels.forEach((label, index) => {
+        const row = document.createElement("div");
+        row.className = "day-row";
+        const current = state.schedule[person.id]?.[index] || "上班";
+        row.innerHTML = `
+          <div class="day-label">週${label}<span class="date">${formatDate(weekDates[index])}</span></div>
+          <select data-person="${person.id}" data-day="${index}">
+            ${shiftOptions.map(option => `<option value="${option}" ${option === current ? "selected" : ""}>${option}</option>`).join("")}
+          </select>
+        `;
+        days.appendChild(row);
+      });
+      return card;
+    }
+
+    function renderStats() {
+      const statsGrid = document.getElementById("statsGrid");
+      const warningsBox = document.getElementById("warnings");
+      statsGrid.innerHTML = "";
+      warningsBox.innerHTML = "";
+      const warnings = [];
+
+      weekdayLabels.forEach((label, index) => {
+        const total = state.staff.length;
+        const off = state.staff.filter(person => state.schedule[person.id]?.[index] === "休").length;
+        const working = total - off;
+        const div = document.createElement("div");
+        div.className = "stat";
+        div.innerHTML = `<b>${label}</b><span>上 ${working}</span><br><span>休 ${off}</span>`;
+        statsGrid.appendChild(div);
+
+        const counterWorking = state.staff.filter(person => person.group === "櫃台" && state.schedule[person.id]?.[index] !== "休").length;
+        const salesWorking = state.staff.filter(person => person.group === "銷售" && state.schedule[person.id]?.[index] !== "休").length;
+        if (counterWorking < 2) warnings.push(`週${label} 櫃台上班人數少於 2 人`);
+        if (salesWorking < 2) warnings.push(`週${label} 銷售上班人數少於 2 人`);
+      });
+
+      state.staff.forEach(person => {
+        const offCount = (state.schedule[person.id] || []).filter(value => value === "休").length;
+        if (offCount > person.weeklyOffLimit) warnings.push(`${person.name} 本週休 ${offCount} 天，超過設定 ${person.weeklyOffLimit} 天`);
+      });
+
+      const notice = document.createElement("div");
+      notice.className = warnings.length ? "notice warn" : "notice ok";
+      notice.innerHTML = warnings.length ? warnings.map(item => `• ${escapeHtml(item)}`).join("<br>") : "目前沒有明顯排班衝突。";
+      warningsBox.appendChild(notice);
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"]/g, match => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[match]));
+    }
+
+    function addStaff() {
+      const nameInput = document.getElementById("newName");
+      const group = document.getElementById("newGroup").value;
+      const name = nameInput.value.trim();
+      if (!name) return;
+      const person = { id: `${group}-${Date.now()}`, group, name, weeklyOffLimit: group === "櫃台" ? 2 : 1 };
+      state.staff.push(person);
+      state.schedule[person.id] = Array(7).fill("上班");
+      nameInput.value = "";
+      render();
+    }
+
+    function removeStaff(id) {
+      state.staff = state.staff.filter(person => person.id !== id);
+      delete state.schedule[id];
+      render();
+    }
+
+    function changeWeek(days) {
+      const date = new Date(state.weekStart + "T00:00:00");
+      date.setDate(date.getDate() + days);
+      state.weekStart = toInputDate(date);
+      render();
+    }
+
+    function resetSchedule() {
+      state.schedule = createSchedule(state.staff);
+      render();
+    }
+
+    function copySchedule() {
+      const weekDates = buildWeek(new Date(state.weekStart + "T00:00:00"));
+      const lines = [`下週班表｜${formatDate(weekDates[0])}-${formatDate(weekDates[6])}`, ""];
+      groups.forEach(group => {
+        lines.push(`【${group}】`);
+        state.staff.filter(person => person.group === group).forEach(person => {
+          const cells = weekdayLabels.map((label, index) => `週${label}:${state.schedule[person.id]?.[index] || "上班"}`);
+          lines.push(`${person.name}｜${cells.join("｜")}`);
+        });
+        lines.push("");
+      });
+      const text = lines.join("\n");
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = document.getElementById("copySchedule");
+        btn.textContent = "已複製";
+        setTimeout(() => btn.textContent = "複製班表", 1400);
+      }).catch(() => alert(text));
+    }
+
+    document.addEventListener("change", event => {
+      if (event.target.matches("select[data-person]")) {
+        const personId = event.target.dataset.person;
+        const day = Number(event.target.dataset.day);
+        state.schedule[personId][day] = event.target.value;
+        render();
+      }
+      if (event.target.id === "weekStart") {
+        state.weekStart = event.target.value;
+        render();
+      }
+    });
+
+    document.addEventListener("click", event => {
+      const removeId = event.target.dataset.remove;
+      if (removeId) removeStaff(removeId);
+    });
+
+    document.getElementById("addStaff").addEventListener("click", addStaff);
+    document.getElementById("newName").addEventListener("keydown", event => { if (event.key === "Enter") addStaff(); });
+    document.getElementById("prevWeek").addEventListener("click", () => changeWeek(-7));
+    document.getElementById("nextWeek").addEventListener("click", () => changeWeek(7));
+    document.getElementById("defaultWeek").addEventListener("click", () => { state.weekStart = toInputDate(getNextMonday()); render(); });
+    document.getElementById("resetSchedule").addEventListener("click", resetSchedule);
+    document.getElementById("copySchedule").addEventListener("click", copySchedule);
+
+    render();
+  </script>
+</body>
+</html>

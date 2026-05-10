@@ -23,7 +23,7 @@
     <section class="hero">
       <p class="eyebrow">手機排班工具</p>
       <h1>下週班表</h1>
-      <p class="desc">每次開啟會自動帶入下一週一到週日。人員新增與刪除會自動記錄，下次打開會維持最新名單；空的分類不會顯示。</p>
+      <p class="desc">每次開啟會自動帶入下一週一到週日。排班選項已精簡為：上班、休、上休、下休。</p>
       <div class="week-box">
         <div class="week-title" id="weekTitle">班表日期</div>
         <div class="week-controls">
@@ -65,7 +65,7 @@
 
   <script>
     const weekdayLabels=["一","二","三","四","五","六","日"];
-    const shiftOptions=["上班","休","早","晚","早多","晚多"];
+    const shiftOptions=["上班","休","上休","下休"];
     const groups=["櫃檯","銷售","專員"];
     const storageKey="mobile-shift-scheduler-v3";
     const oldStorageKeys=["mobile-shift-scheduler-v2","mobile-shift-scheduler-v1"];
@@ -88,6 +88,8 @@
     function toInputDate(date){const d=new Date(date);d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10)}
     function formatDate(date){const d=new Date(date);return `${d.getMonth()+1}/${d.getDate()}`}
     function buildWeek(startDate){return Array.from({length:7},(_,i)=>{const d=new Date(startDate);d.setDate(d.getDate()+i);return d})}
+    function cleanShift(value){return shiftOptions.includes(value)?value:"上班"}
+    function isWorkingShift(value){return cleanShift(value)!=="休"}
     function createSchedule(staff){const s={};staff.forEach(p=>s[p.id]=Array(7).fill("上班"));return s}
     function activeGroups(){return groups.filter(g=>state.staff.some(p=>p.group===g))}
 
@@ -111,8 +113,8 @@
         return {...p,group,weeklyOffLimit:Number.isFinite(Number(p.weeklyOffLimit))?Number(p.weeklyOffLimit):(group==="櫃檯"?1:2)};
       });
     }
-    function ensureSchedule(staff,schedule){const next={...schedule};staff.forEach(p=>{if(!Array.isArray(next[p.id]))next[p.id]=Array(7).fill("上班")});Object.keys(next).forEach(id=>{if(!staff.some(p=>p.id===id))delete next[id]});return next}
-    function saveState(){localStorage.setItem(storageKey,JSON.stringify({staff:state.staff,schedule:state.schedule,updatedAt:new Date().toISOString()}))}
+    function ensureSchedule(staff,schedule){const next={...schedule};staff.forEach(p=>{if(!Array.isArray(next[p.id]))next[p.id]=Array(7).fill("上班");next[p.id]=next[p.id].slice(0,7).map(cleanShift);while(next[p.id].length<7)next[p.id].push("上班")});Object.keys(next).forEach(id=>{if(!staff.some(p=>p.id===id))delete next[id]});return next}
+    function saveState(){state.schedule=ensureSchedule(state.staff,state.schedule);localStorage.setItem(storageKey,JSON.stringify({staff:state.staff,schedule:state.schedule,updatedAt:new Date().toISOString()}))}
 
     function render(){
       const weekStart=new Date(state.weekStart+"T00:00:00");const weekDates=buildWeek(weekStart);
@@ -127,18 +129,18 @@
     }
     function renderPersonCard(person,weekDates){
       const card=document.createElement("div");card.className="card";
-      const offCount=(state.schedule[person.id]||[]).filter(v=>v==="休").length;
+      const offCount=(state.schedule[person.id]||[]).filter(v=>cleanShift(v)==="休").length;
       card.innerHTML=`<div class="person-head"><div><div class="person-name">${escapeHtml(person.name)}<span class="pill">${person.group}</span></div><div class="small">本週休 ${offCount} / ${person.weeklyOffLimit} 天</div></div><button class="danger" data-remove="${person.id}">刪除</button></div><div class="days"></div>`;
       const days=card.querySelector(".days");
-      weekdayLabels.forEach((label,i)=>{const row=document.createElement("div");row.className="day-row";const current=state.schedule[person.id]?.[i]||"上班";row.innerHTML=`<div class="day-label">週${label}<span class="date">${formatDate(weekDates[i])}</span></div><select data-person="${person.id}" data-day="${i}">${shiftOptions.map(o=>`<option value="${o}" ${o===current?"selected":""}>${o}</option>`).join("")}</select>`;days.appendChild(row)});
+      weekdayLabels.forEach((label,i)=>{const row=document.createElement("div");row.className="day-row";const current=cleanShift(state.schedule[person.id]?.[i]||"上班");row.innerHTML=`<div class="day-label">週${label}<span class="date">${formatDate(weekDates[i])}</span></div><select data-person="${person.id}" data-day="${i}">${shiftOptions.map(o=>`<option value="${o}" ${o===current?"selected":""}>${o}</option>`).join("")}</select>`;days.appendChild(row)});
       return card;
     }
     function renderStats(){
       const statsGrid=document.getElementById("statsGrid"),warningsBox=document.getElementById("warnings");statsGrid.innerHTML="";warningsBox.innerHTML="";const warnings=[];
-      weekdayLabels.forEach((label,i)=>{const total=state.staff.length;const off=state.staff.filter(p=>state.schedule[p.id]?.[i]==="休").length;const working=total-off;const div=document.createElement("div");div.className="stat";div.innerHTML=`<b>${label}</b><span class="work">上 ${working}</span><br><span class="off">休 ${off}</span>`;statsGrid.appendChild(div);
-        activeGroups().forEach(group=>{const workingByGroup=state.staff.filter(p=>p.group===group&&state.schedule[p.id]?.[i]!=="休").length;const min=group==="櫃檯"?1:2;if(workingByGroup<min)warnings.push(`週${label} ${group}上班人數少於 ${min} 人`)})
+      weekdayLabels.forEach((label,i)=>{const total=state.staff.length;const off=state.staff.filter(p=>cleanShift(state.schedule[p.id]?.[i])==="休").length;const working=total-off;const div=document.createElement("div");div.className="stat";div.innerHTML=`<b>${label}</b><span class="work">上 ${working}</span><br><span class="off">休 ${off}</span>`;statsGrid.appendChild(div);
+        activeGroups().forEach(group=>{const workingByGroup=state.staff.filter(p=>p.group===group&&isWorkingShift(state.schedule[p.id]?.[i])).length;const min=group==="櫃檯"?1:2;if(workingByGroup<min)warnings.push(`週${label} ${group}上班人數少於 ${min} 人`)})
       });
-      state.staff.forEach(p=>{const offCount=(state.schedule[p.id]||[]).filter(v=>v==="休").length;if(offCount>p.weeklyOffLimit)warnings.push(`${p.name} 本週休 ${offCount} 天，超過設定 ${p.weeklyOffLimit} 天`)});
+      state.staff.forEach(p=>{const offCount=(state.schedule[p.id]||[]).filter(v=>cleanShift(v)==="休").length;if(offCount>p.weeklyOffLimit)warnings.push(`${p.name} 本週休 ${offCount} 天，超過設定 ${p.weeklyOffLimit} 天`)});
       const notice=document.createElement("div");notice.className=warnings.length?"notice warn":"notice ok";notice.innerHTML=warnings.length?warnings.map(w=>`• ${escapeHtml(w)}`).join("<br>"):"目前沒有明顯排班衝突。";warningsBox.appendChild(notice);
     }
     function escapeHtml(v){return String(v).replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]))}
@@ -150,7 +152,7 @@
 
     function copySchedule(){
       const weekDates=buildWeek(new Date(state.weekStart+"T00:00:00"));const lines=[`下週班表｜${formatDate(weekDates[0])}-${formatDate(weekDates[6])}`,""];
-      activeGroups().forEach(group=>{lines.push(`【${group}】`);state.staff.filter(p=>p.group===group).forEach(p=>{const cells=weekdayLabels.map((label,i)=>`週${label}:${state.schedule[p.id]?.[i]||"上班"}`);lines.push(`${p.name}｜${cells.join("｜")}`)});lines.push("")});
+      activeGroups().forEach(group=>{lines.push(`【${group}】`);state.staff.filter(p=>p.group===group).forEach(p=>{const cells=weekdayLabels.map((label,i)=>`週${label}:${cleanShift(state.schedule[p.id]?.[i]||"上班")}`);lines.push(`${p.name}｜${cells.join("｜")}`)});lines.push("")});
       const text=lines.join("\n");navigator.clipboard.writeText(text).then(()=>flashButton("copySchedule","已複製","複製文字")).catch(()=>alert(text));
     }
 
@@ -165,7 +167,7 @@
       weekdayLabels.forEach((label,i)=>{const cx=x0+colNameW+i*colW;centerText(ctx,`週${label}`,cx,ty+7,colW,20);ctx.font="500 11px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif";centerText(ctx,formatDate(weekDates[i]),cx,ty+27,colW,16);ctx.font="700 15px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"});ty+=headerH;
       rows.forEach(row=>{if(row.type==="group"){ctx.fillStyle="#f5f5f4";ctx.fillRect(x0,ty,tableW,groupH);ctx.fillStyle="#1c1917";ctx.font="700 16px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif";ctx.fillText(row.group,x0+14,ty+24);drawLine(ctx,x0,ty+groupH,x0+tableW,ty+groupH,"#e7e5e4");ty+=groupH;return}
         const p=row.person;ctx.fillStyle="#fff";ctx.fillRect(x0,ty,tableW,rowH);ctx.fillStyle="#1c1917";ctx.font="700 15px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif";centerText(ctx,p.name,x0,ty,colNameW,rowH);
-        weekdayLabels.forEach((_,i)=>{const cx=x0+colNameW+i*colW;const value=state.schedule[p.id]?.[i]||"上班";ctx.fillStyle=value==="休"?"#991b1b":"#1c1917";ctx.font="700 15px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif";centerText(ctx,value,cx,ty,colW,rowH)});
+        weekdayLabels.forEach((_,i)=>{const cx=x0+colNameW+i*colW;const value=cleanShift(state.schedule[p.id]?.[i]||"上班");ctx.fillStyle=value==="休"?"#991b1b":"#1c1917";ctx.font="700 15px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif";centerText(ctx,value,cx,ty,colW,rowH)});
         for(let i=0;i<=7;i++)drawLine(ctx,x0+colNameW+i*colW,ty,x0+colNameW+i*colW,ty+rowH,"#e7e5e4");drawLine(ctx,x0,ty+rowH,x0+tableW,ty+rowH,"#e7e5e4");ty+=rowH});
       drawLine(ctx,x0+colNameW,y,x0+colNameW,y+tableH,"#d6d3d1");for(let i=0;i<=7;i++)drawLine(ctx,x0+colNameW+i*colW,y,x0+colNameW+i*colW,y+tableH,"#e7e5e4");
       ctx.fillStyle="#78716c";ctx.font="500 12px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif";ctx.fillText("手機排班工具輸出｜可直接分享至 LINE",x0,y+tableH+30);return canvas;
@@ -179,7 +181,7 @@
       const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=fileName;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);flashButton("exportImage","已下載","輸出圖片");
     }
 
-    document.addEventListener("change",e=>{if(e.target.matches("select[data-person]")){const id=e.target.dataset.person;const day=Number(e.target.dataset.day);state.schedule[id][day]=e.target.value;render()}if(e.target.id==="weekStart"){state.weekStart=e.target.value;render()}});
+    document.addEventListener("change",e=>{if(e.target.matches("select[data-person]")){const id=e.target.dataset.person;const day=Number(e.target.dataset.day);state.schedule[id][day]=cleanShift(e.target.value);render()}if(e.target.id==="weekStart"){state.weekStart=e.target.value;render()}});
     document.addEventListener("click",e=>{const id=e.target.dataset.remove;if(id)removeStaff(id)});
     document.getElementById("addStaff").addEventListener("click",addStaff);
     document.getElementById("newName").addEventListener("keydown",e=>{if(e.key==="Enter")addStaff()});

@@ -13,7 +13,6 @@
       --muted: #78716c;
       --line: #e7e5e4;
       --dark: #111827;
-      --soft: #f8fafc;
       --warn-bg: #fffbeb;
       --warn: #92400e;
       --ok-bg: #ecfdf5;
@@ -27,9 +26,9 @@
       color: var(--text);
     }
     .app {
-      width: min(100%, 520px);
+      width: min(100%, 560px);
       margin: 0 auto;
-      padding: 16px 14px 92px;
+      padding: 16px 14px 104px;
     }
     .hero, .card {
       background: var(--card);
@@ -52,10 +51,7 @@
     }
     .week-title { font-weight: 700; margin-bottom: 10px; }
     .week-controls { display: grid; grid-template-columns: 42px 1fr 42px; gap: 8px; }
-    input, select, button {
-      font: inherit;
-      border-radius: 14px;
-    }
+    input, select, button { font: inherit; border-radius: 14px; }
     input, select {
       width: 100%;
       border: 1px solid var(--line);
@@ -77,7 +73,7 @@
     button.danger { background: #fee2e2; color: #991b1b; }
     .full { width: 100%; margin-top: 8px; }
     .card { padding: 14px; margin: 10px 0; }
-    .add-grid { display: grid; grid-template-columns: 92px 1fr; gap: 8px; }
+    .add-grid { display: grid; grid-template-columns: 104px 1fr; gap: 8px; }
     .person-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
     .person-name { font-weight: 800; font-size: 17px; }
     .small { color: var(--muted); font-size: 12px; margin-top: 2px; }
@@ -118,13 +114,18 @@
       left: 50%;
       bottom: calc(12px + env(safe-area-inset-bottom));
       transform: translateX(-50%);
-      width: min(100% - 28px, 492px);
+      width: min(100% - 28px, 532px);
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 0.9fr 1fr 1.15fr;
       gap: 8px;
       z-index: 20;
     }
-    .sticky button { min-height: 54px; box-shadow: 0 12px 24px rgba(15, 23, 42, 0.18); }
+    .sticky button {
+      min-height: 54px;
+      padding: 8px 8px;
+      box-shadow: 0 12px 24px rgba(15, 23, 42, 0.18);
+      font-size: 14px;
+    }
     .pill {
       display: inline-flex;
       align-items: center;
@@ -136,6 +137,12 @@
       margin-left: 6px;
     }
     .empty { color: var(--muted); font-size: 14px; padding: 12px 4px; }
+    .share-note {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 8px;
+      line-height: 1.45;
+    }
   </style>
 </head>
 <body>
@@ -143,7 +150,7 @@
     <section class="hero">
       <p class="eyebrow">手機排班工具</p>
       <h1>下週班表</h1>
-      <p class="desc">每次開啟會自動帶入下一週一到週日。可新增、刪除人員，修改日期，排完後一鍵複製給 LINE 或再貼回 Excel。</p>
+      <p class="desc">每次開啟會自動帶入下一週一到週日。可新增、刪除人員，修改日期，排完後可一鍵複製文字或輸出圖片分享到 LINE。</p>
       <div class="week-box">
         <div class="week-title" id="weekTitle">班表日期</div>
         <div class="week-controls">
@@ -159,12 +166,14 @@
       <div class="person-name">新增人員</div>
       <div class="add-grid" style="margin-top:10px;">
         <select id="newGroup">
-          <option value="櫃台">櫃台</option>
+          <option value="櫃檯">櫃檯</option>
           <option value="銷售">銷售</option>
+          <option value="專員">專員</option>
         </select>
         <input id="newName" placeholder="輸入姓名" />
       </div>
       <button class="full" id="addStaff">加入班表</button>
+      <div class="share-note">目前預設：王柏勳為櫃檯，其餘既有人員皆為專員。銷售分類保留給你之後新增銷售人員使用。</div>
     </section>
 
     <section id="staffSections"></section>
@@ -178,27 +187,28 @@
 
   <div class="sticky">
     <button class="secondary" id="resetSchedule">重排</button>
-    <button id="copySchedule">複製班表</button>
+    <button id="copySchedule">複製文字</button>
+    <button id="exportImage">輸出圖片</button>
   </div>
 
   <script>
     const weekdayLabels = ["一", "二", "三", "四", "五", "六", "日"];
     const shiftOptions = ["上班", "休", "早", "晚", "早多", "晚多"];
-    const groups = ["櫃台", "銷售"];
-    const storageKey = "mobile-shift-scheduler-v1";
+    const groups = ["櫃檯", "銷售", "專員"];
+    const storageKey = "mobile-shift-scheduler-v2";
 
     const defaultStaff = [
-      { id: "counter-1", group: "櫃台", name: "王柏勳", weeklyOffLimit: 1 },
-      { id: "counter-2", group: "櫃台", name: "曾琛苡", weeklyOffLimit: 2 },
-      { id: "counter-3", group: "櫃台", name: "石嫚倪", weeklyOffLimit: 2 },
-      { id: "counter-4", group: "櫃台", name: "黃韻蓁", weeklyOffLimit: 2 },
-      { id: "counter-5", group: "櫃台", name: "鄭詩怡", weeklyOffLimit: 2 },
-      { id: "counter-6", group: "櫃台", name: "鄭毓柔", weeklyOffLimit: 5 },
-      { id: "sales-1", group: "銷售", name: "黃素月", weeklyOffLimit: 2 },
-      { id: "sales-2", group: "銷售", name: "高圓媛", weeklyOffLimit: 1 },
-      { id: "sales-3", group: "銷售", name: "鄭冠琳", weeklyOffLimit: 1 },
-      { id: "sales-4", group: "銷售", name: "宋大喜", weeklyOffLimit: 2 },
-      { id: "sales-5", group: "銷售", name: "陳金燕", weeklyOffLimit: 1 }
+      { id: "counter-1", group: "櫃檯", name: "王柏勳", weeklyOffLimit: 1 },
+      { id: "specialist-1", group: "專員", name: "曾琛苡", weeklyOffLimit: 2 },
+      { id: "specialist-2", group: "專員", name: "石嫚倪", weeklyOffLimit: 2 },
+      { id: "specialist-3", group: "專員", name: "黃韻蓁", weeklyOffLimit: 2 },
+      { id: "specialist-4", group: "專員", name: "鄭詩怡", weeklyOffLimit: 2 },
+      { id: "specialist-5", group: "專員", name: "鄭毓柔", weeklyOffLimit: 5 },
+      { id: "specialist-6", group: "專員", name: "黃素月", weeklyOffLimit: 2 },
+      { id: "specialist-7", group: "專員", name: "高圓媛", weeklyOffLimit: 1 },
+      { id: "specialist-8", group: "專員", name: "鄭冠琳", weeklyOffLimit: 1 },
+      { id: "specialist-9", group: "專員", name: "宋大喜", weeklyOffLimit: 2 },
+      { id: "specialist-10", group: "專員", name: "陳金燕", weeklyOffLimit: 1 }
     ];
 
     let state = loadState();
@@ -243,13 +253,20 @@
         const saved = JSON.parse(localStorage.getItem(storageKey));
         if (saved && saved.staff && saved.schedule) {
           return {
-            staff: saved.staff,
+            staff: normalizeStaff(saved.staff),
             schedule: ensureSchedule(saved.staff, saved.schedule),
             weekStart: defaultWeek
           };
         }
       } catch (error) {}
       return { staff: defaultStaff, schedule: createSchedule(defaultStaff), weekStart: defaultWeek };
+    }
+
+    function normalizeStaff(staff) {
+      return staff.map(person => ({
+        ...person,
+        group: person.group === "櫃台" ? "櫃檯" : person.group
+      }));
     }
 
     function ensureSchedule(staff, schedule) {
@@ -289,7 +306,7 @@
         people.forEach(person => root.appendChild(renderPersonCard(person, weekDates)));
       });
 
-      renderStats(weekDates);
+      renderStats();
       saveState();
     }
 
@@ -339,10 +356,12 @@
         div.innerHTML = `<b>${label}</b><span>上 ${working}</span><br><span>休 ${off}</span>`;
         statsGrid.appendChild(div);
 
-        const counterWorking = state.staff.filter(person => person.group === "櫃台" && state.schedule[person.id]?.[index] !== "休").length;
+        const counterWorking = state.staff.filter(person => person.group === "櫃檯" && state.schedule[person.id]?.[index] !== "休").length;
         const salesWorking = state.staff.filter(person => person.group === "銷售" && state.schedule[person.id]?.[index] !== "休").length;
-        if (counterWorking < 2) warnings.push(`週${label} 櫃台上班人數少於 2 人`);
-        if (salesWorking < 2) warnings.push(`週${label} 銷售上班人數少於 2 人`);
+        const specialistWorking = state.staff.filter(person => person.group === "專員" && state.schedule[person.id]?.[index] !== "休").length;
+        if (counterWorking < 1) warnings.push(`週${label} 櫃檯上班人數少於 1 人`);
+        if (state.staff.some(person => person.group === "銷售") && salesWorking < 1) warnings.push(`週${label} 銷售上班人數少於 1 人`);
+        if (specialistWorking < 2) warnings.push(`週${label} 專員上班人數少於 2 人`);
       });
 
       state.staff.forEach(person => {
@@ -365,7 +384,7 @@
       const group = document.getElementById("newGroup").value;
       const name = nameInput.value.trim();
       if (!name) return;
-      const person = { id: `${group}-${Date.now()}`, group, name, weeklyOffLimit: group === "櫃台" ? 2 : 1 };
+      const person = { id: `${group}-${Date.now()}`, group, name, weeklyOffLimit: group === "櫃檯" ? 1 : 2 };
       state.staff.push(person);
       state.schedule[person.id] = Array(7).fill("上班");
       nameInput.value = "";
@@ -403,10 +422,170 @@
       });
       const text = lines.join("\n");
       navigator.clipboard.writeText(text).then(() => {
-        const btn = document.getElementById("copySchedule");
-        btn.textContent = "已複製";
-        setTimeout(() => btn.textContent = "複製班表", 1400);
+        flashButton("copySchedule", "已複製", "複製文字");
       }).catch(() => alert(text));
+    }
+
+    function flashButton(id, activeText, defaultText) {
+      const btn = document.getElementById(id);
+      btn.textContent = activeText;
+      setTimeout(() => btn.textContent = defaultText, 1600);
+    }
+
+    function makeScheduleCanvas() {
+      const scale = 2;
+      const margin = 42;
+      const titleH = 92;
+      const colNameW = 120;
+      const colW = 76;
+      const headerH = 48;
+      const groupH = 38;
+      const rowH = 46;
+      const tableW = colNameW + colW * 7;
+      let rows = [];
+      groups.forEach(group => {
+        const people = state.staff.filter(person => person.group === group);
+        rows.push({ type: "group", group });
+        if (people.length === 0) rows.push({ type: "empty", group, name: "—" });
+        people.forEach(person => rows.push({ type: "person", person }));
+      });
+      const tableH = headerH + rows.reduce((sum, row) => sum + (row.type === "group" ? groupH : rowH), 0);
+      const footerH = 46;
+      const canvas = document.createElement("canvas");
+      canvas.width = (tableW + margin * 2) * scale;
+      canvas.height = (titleH + tableH + footerH + margin * 2) * scale;
+      const ctx = canvas.getContext("2d");
+      ctx.scale(scale, scale);
+
+      const width = canvas.width / scale;
+      const height = canvas.height / scale;
+      const x0 = margin;
+      let y = margin;
+      const weekDates = buildWeek(new Date(state.weekStart + "T00:00:00"));
+
+      ctx.fillStyle = "#f8fafc";
+      ctx.fillRect(0, 0, width, height);
+      ctx.fillStyle = "#111827";
+      ctx.font = "700 30px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+      ctx.fillText("下週班表", x0, y + 32);
+      ctx.font = "500 17px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+      ctx.fillStyle = "#57534e";
+      ctx.fillText(`${formatDate(weekDates[0])} - ${formatDate(weekDates[6])}`, x0, y + 62);
+      y += titleH;
+
+      roundedRect(ctx, x0, y, tableW, tableH, 18, "#ffffff", "#d6d3d1");
+      let ty = y;
+      ctx.fillStyle = "#111827";
+      ctx.fillRect(x0, ty, tableW, headerH);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "700 15px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+      centerText(ctx, "人員", x0, ty, colNameW, headerH);
+      weekdayLabels.forEach((label, index) => {
+        const cx = x0 + colNameW + index * colW;
+        centerText(ctx, `週${label}`, cx, ty + 7, colW, 20);
+        ctx.font = "500 11px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+        centerText(ctx, formatDate(weekDates[index]), cx, ty + 27, colW, 16);
+        ctx.font = "700 15px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+      });
+      ty += headerH;
+
+      rows.forEach(row => {
+        if (row.type === "group") {
+          ctx.fillStyle = "#f5f5f4";
+          ctx.fillRect(x0, ty, tableW, groupH);
+          ctx.fillStyle = "#1c1917";
+          ctx.font = "700 16px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+          ctx.fillText(row.group, x0 + 14, ty + 24);
+          drawLine(ctx, x0, ty + groupH, x0 + tableW, ty + groupH, "#e7e5e4");
+          ty += groupH;
+          return;
+        }
+
+        const person = row.person;
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(x0, ty, tableW, rowH);
+        ctx.fillStyle = "#1c1917";
+        ctx.font = "700 15px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+        const name = person ? person.name : "—";
+        centerText(ctx, name, x0, ty, colNameW, rowH);
+        weekdayLabels.forEach((label, index) => {
+          const cx = x0 + colNameW + index * colW;
+          const value = person ? (state.schedule[person.id]?.[index] || "上班") : "—";
+          ctx.fillStyle = value === "休" ? "#991b1b" : "#1c1917";
+          ctx.font = "700 15px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+          centerText(ctx, value, cx, ty, colW, rowH);
+        });
+        for (let i = 0; i <= 7; i++) drawLine(ctx, x0 + colNameW + i * colW, ty, x0 + colNameW + i * colW, ty + rowH, "#e7e5e4");
+        drawLine(ctx, x0, ty + rowH, x0 + tableW, ty + rowH, "#e7e5e4");
+        ty += rowH;
+      });
+
+      drawLine(ctx, x0 + colNameW, y, x0 + colNameW, y + tableH, "#d6d3d1");
+      for (let i = 0; i <= 7; i++) drawLine(ctx, x0 + colNameW + i * colW, y, x0 + colNameW + i * colW, y + tableH, "#e7e5e4");
+
+      ctx.fillStyle = "#78716c";
+      ctx.font = "500 12px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+      ctx.fillText("手機排班工具輸出｜可直接分享至 LINE", x0, y + tableH + 30);
+      return canvas;
+    }
+
+    function roundedRect(ctx, x, y, w, h, r, fill, stroke) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+      ctx.fillStyle = fill;
+      ctx.fill();
+      ctx.strokeStyle = stroke;
+      ctx.stroke();
+    }
+
+    function drawLine(ctx, x1, y1, x2, y2, color) {
+      ctx.beginPath();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+    }
+
+    function centerText(ctx, text, x, y, w, h) {
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(text, x + w / 2, y + h / 2);
+      ctx.textAlign = "start";
+      ctx.textBaseline = "alphabetic";
+    }
+
+    async function exportImage() {
+      const canvas = makeScheduleCanvas();
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/png", 1));
+      const weekDates = buildWeek(new Date(state.weekStart + "T00:00:00"));
+      const fileName = `班表_${formatDate(weekDates[0]).replace("/", "-")}_${formatDate(weekDates[6]).replace("/", "-")}.png`;
+      const file = new File([blob], fileName, { type: "image/png" });
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: "下週班表", text: "下週班表圖片" });
+          flashButton("exportImage", "已開啟分享", "輸出圖片");
+          return;
+        } catch (error) {
+          if (error && error.name === "AbortError") return;
+        }
+      }
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      flashButton("exportImage", "已下載", "輸出圖片");
     }
 
     document.addEventListener("change", event => {
@@ -434,6 +613,7 @@
     document.getElementById("defaultWeek").addEventListener("click", () => { state.weekStart = toInputDate(getNextMonday()); render(); });
     document.getElementById("resetSchedule").addEventListener("click", resetSchedule);
     document.getElementById("copySchedule").addEventListener("click", copySchedule);
+    document.getElementById("exportImage").addEventListener("click", exportImage);
 
     render();
   </script>
